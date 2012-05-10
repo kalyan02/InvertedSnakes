@@ -1,0 +1,543 @@
+<html>
+	<head>
+		<title>Double Snake</title>
+
+	<style type="text/css">
+		body { text-align:center; font:12px Verdana;  }
+		#container { text-align:center; border:0px solid #ccc; width:1024px; margin:auto; overflow:hidden; margin-top:50px; }
+		#info { width:200px; text-align:left; float:left; border:0px solid #ccc; margin-left:20px; height:600px;
+		}
+		#info p { font-size:13px; }
+		#info h1 { font-weight:normal; font-size:30px; margin:0; }
+		#canvasdiv { text-align:center; float:left; }
+		canvas { border:1px solid #ccc; }
+		
+		.by { margin-top:40px; }
+		.by a { color:#FFF; text-decoration:none; background:#CCC; padding:2px 2px; font-size:10px; }
+		.by a:hover { background:#999; }
+	</style>
+
+
+	</head>
+
+	<body>
+
+<div id="container">
+    	<div id="info">
+        	<h1>Inverted Snakes</h1>
+            <p>Snakes always move in opposite direction.</p>
+			<p>Snakes can only eat same colored food</p>
+			<p>&lt;Space&gt; to start/pause</p>
+            <p class="stats"></p>
+            <p class="by"><a href="http://KalyanChakravarthy.net">by me</a></p>
+        </div>
+    	<div id="canvasdiv">
+        	<canvas id="canvas" width="400" height="600"></canvas>
+        </div>
+
+
+		<script language="javascript">
+			canvasElement = document.getElementById("canvas");
+			console.log( canvasElement );
+			console.log( "Foo" );
+			var Dir = {
+				LEFT : 0,
+				UP : 1,
+				RIGHT : 2,
+				DOWN: 3
+			};
+
+			var Key = {
+				LEFT : 37,
+				UP : 38,
+				RIGHT : 39,
+				DOWN : 40,
+				SPACE : 32
+			};
+
+			// Ironical eh?
+			var Consts = {
+				STEP : 15
+			};
+
+			TiledStage = function() {
+				this.canvas= null;
+				this.ctx = null;
+				this.xTiles = 10;
+				this.yTiles = 10;
+				this.children = [];
+				this.timeoutID = null;
+				this.width = 0;
+				this.height = 0;
+			};
+
+			TiledStage.prototype = { 
+				init : function(canvasRef, xTiles, yTiles) {
+					this.keyTriggers = {};
+					this.hasTriggers = false;
+					this.canvas = canvasRef;
+					console.log( canvasRef );
+					this.ctx = this.canvas.getContext( "2d" );
+					this.xTiles = xTiles;
+					this.yTiles = yTiles;
+					this.fps = 50;
+
+					this.width = this.canvas.width = xTiles * Consts.STEP;
+					this.height = this.canvas.height = yTiles * Consts.STEP;
+				},
+
+				setRenderFPS : function( fps ) {
+					this.fps = fps;
+				},
+
+				startRender : function() {
+					stageRef = this;
+					this.timeoutID = setInterval( function() {
+						stageRef.render();
+					}, 1000/this.fps );
+				},
+
+				stopRender : function() {
+					this.timeoutID = clearInterval( this.timeoutID );
+				},
+
+				render: function( obj ) {
+					this.clear();
+					for ( i in this.children ) {
+						child = this.children[i];
+						if( child.tick )
+							child.tick();
+						if( child.draw )
+							child.draw();
+					}
+				},
+
+				clear : function() {
+					with( this.ctx ) {
+						fillStyle = "#ffffff";
+						fillRect( 0, 0, this.width, this.height );
+					}
+				},
+
+				add : function( obj ) {
+					this.children.push( obj );
+					obj.renderer = this;
+					if( obj.onAdd )
+						obj.onAdd();
+				},
+
+
+				drawCell : function( i, j, color ) {
+					theX = i * Consts.STEP;
+					theY = j * Consts.STEP;
+					theS = Consts.STEP;
+					//console.log( "Draw ("+i+","+j+")" );
+					with( stage.ctx ) {
+						fillStyle = "#fff";
+						strokeStyle = color;
+						strokeWidth = 1;
+						beginPath();
+						moveTo( theX + 1, theY + 1 );
+						lineTo( theX + theS - 1, theY + 1);
+						lineTo( theX + theS - 1, theY + theS - 1 );
+						lineTo( theX + 1, theY + theS - 1 );
+						lineTo( theX + 1, theY + 1 );
+						closePath();
+						stroke();
+				   
+						fillStyle = color;
+						offsetL = Math.floor(Consts.STEP/4);
+						fillRect( i * Consts.STEP + offsetL, j * Consts.STEP + offsetL, Consts.STEP - offsetL*2, Consts.STEP - offsetL*2 );
+			
+					}
+				},
+
+				trigger : function( key, fn ) {
+					this.hasTriggers = true;
+					if( !this.keyTriggers.hasOwnProperty( key ) )
+						this.keyTriggers[ key ] = [];
+					this.keyTriggers[ key ].push( fn );
+				},
+
+				readKey : function( event ) {
+					//if( !this.hasTriggers ) return;
+					if( this.keyTriggers.hasOwnProperty( event.which ) ) {
+						funcs = this.keyTriggers[ event.which ];
+						for( i=0; i<funcs.length; i++ ) {
+							funcs[i].call(funcs[i]) ;
+						}
+					}
+					
+				},
+
+				randomTile : function() {
+					x = Util.randInt( this.xTiles );
+					y = Util.randInt( this.yTiles );
+
+					for( i=0; i<this.children.length; i++ ) {
+						if( this.children[i].children ) {
+							for(j=0; j<this.children[i].children.length; j++ ) {
+								coord = this.children[i].children[j];
+								if( coord.x == x && coord.y == y )
+									return this.randomTile();
+							}
+						}
+					}
+
+					return { x:x, y:y };
+				},
+
+
+
+			};
+
+			Util = {
+				logCoord:function( title, coord ) {
+					console.log( title + "(" + coord.x + ", " + coord.y + ")" );
+				},
+				randInt:function(limit) {
+					return Math.floor( Math.random() * limit );
+				}
+			};
+
+			// End of TileStage
+
+			Snake = function() {
+				this.renderer = null;
+				this.scales = [];
+				this.children = this.scales;
+				this.head = { x:0, y:0 };
+				this.currDir = Dir.UP;
+				this.ctx = null;
+				this.color = '#ccc';
+				this.name = "snake";
+				this.foodPos=null;
+			}
+
+			Snake.prototype = {
+				init : function( x, y, dir ) {
+					this.head = { x:x, y:y };
+					this.currDir = dir;
+					this.scales.push( this.head );
+					tail = { x:this.head.x, y:this.head.y};
+					for( i=0; i<3; i++ ) {
+						this.growSnake();
+					}
+
+				},
+
+				onAdd:function() {
+					//this.newFood();
+				},
+
+				move : function() {
+					this.scales.splice( this.scales.length - 1, 1 );
+
+					nextHead = this.nextHead();
+
+					if( nextHead.y < 0 )
+						nextHead.y = this.renderer.yTiles;
+					else
+					if( nextHead.y >= this.renderer.yTiles )
+						nextHead.y -= this.renderer.yTiles;
+
+					if( nextHead.x < 0 )
+						nextHead.x = this.renderer.xTiles;
+					else
+					if( nextHead.x >= this.renderer.xTiles )
+						nextHead.x -= this.renderer.xTiles;
+
+					if( this.isFood( nextHead ) ) {
+						this.growSnake();
+						//this.newFood();
+						if( this.onFoodEat )
+							this.onFoodEat();
+					}
+
+					this.scales.splice( 0, 0, nextHead );
+				},
+
+				isFood:function(pos) {
+					if( this.foodPos!=null )
+						return pos.x == this.foodPos.x && pos.y == this.foodPos.y;
+					else
+						return false;
+
+				},
+
+				newFood:function() {
+					newFoodPos = this.renderer.randomTile();
+					this.foodPos = newFoodPos;
+				},
+
+				removeFood:function() {
+					this.foodPos = null;
+				},
+
+				growSnake:function() {
+					lastSeg = this.scales[ this.scales.length-1 ];
+					if( this.scales.length > 2 ) {
+						secondLastSeg = this.scales[ this.scales.length -2 ];
+					} else {
+						secondLastSeg = this.nextHead();
+					}
+
+					//Util.logCoord( "lastSeg", lastSeg );
+					newTail = { x: lastSeg.x, y: lastSeg.y };
+					//Util.logCoord( "newTail", newTail );
+
+					if( lastSeg.y == secondLastSeg.y )
+						newTail.x += lastSeg.x < secondLastSeg.x ? -1 : 1;
+
+					if( lastSeg.x == secondLastSeg.x )
+						newTail.y += lastSeg.y < secondLastSeg.y ? -1 : 1;
+
+					this.scales.push( newTail );
+				},
+
+				nextHead : function() {
+					// Variables in Telugu. Yay!
+					thalakaya = this.scales[0];
+					aepakkana = this.nextHeadOffset();
+					kotthaThalakaya = {
+						x : thalakaya.x + aepakkana.x,
+						y : thalakaya.y + aepakkana.y
+					};
+
+					return kotthaThalakaya;
+				},
+
+				nextHeadOffset : function() {
+					dir = this.currDir;
+					if( dir == Dir.LEFT ) return { x : -1, y: 0 };
+					if( dir == Dir.RIGHT ) return { x : 1, y: 0 };
+					if( dir == Dir.UP ) return { x : 0, y : -1 };
+					if( dir == Dir.DOWN ) return { x : 0, y: 1 };
+				},
+
+				draw : function() {
+					for( i=0; i<this.scales.length; i++ ) {
+						//console.log( this.name );
+						this.renderer.drawCell( this.scales[i].x, this.scales[i].y, this.color );
+					}
+					if( this.foodPos!=null )
+						this.renderer.drawCell( this.foodPos.x, this.foodPos.y, this.color );
+				},
+
+				tick : function() {
+					this.move();
+				},
+
+				setColor : function( c ) {
+					this.color =  c;
+				},
+
+				goLeft : function() { this.currDir = Dir.LEFT; },
+				goRight : function() { this.currDir = Dir.RIGHT; },
+				goUp : function() { this.currDir = Dir.UP; },
+				goDown : function() { this.currDir = Dir.DOWN; }
+			};
+
+
+			FoodManager = function() {
+				this.snakes = [];
+			};
+
+			FoodManager.prototype = {
+				addSnake : function(snake) { 
+					this.snakes.push(snake);
+					foodMgr = this;
+					snake.onFoodEat = function() {
+						foodMgr.newSnakeFood(snake);
+					}
+				},
+
+				setupFoods:function() {
+					this.snakes[0].newFood();
+				},
+
+				newSnakeFood:function(theSnake) {
+					theSnake.removeFood();
+					currSnake = this.snakes.indexOf( theSnake );
+					nextSnakeId = (currSnake + 1) % this.snakes.length;
+					nextSnake = this.snakes[ nextSnakeId ];
+					nextSnake.newFood();
+
+					if( this.onNewFood )
+						this.onNewFood( { snake:snake, snakeId:currSnake } );
+				}
+			};
+
+
+			StatsInfo = function(name, x,y){
+				this.name = name;
+				this.value = 0;
+				this.animate = false;
+				this.pos = { x:x, y:y };
+				this.renderer = null;
+
+				this.updateToTarget = 0;
+				this.updateValueFunc = null;
+			};
+			StatsInfo.prototype = {
+				setValue:function( val ) {
+					this.value = val;
+				},
+
+				addValue : function( val, animSteps ) {
+					activeOffset = 0;
+					if( this.updateToTarget > 0 ) {
+						this.value = this.updateToTarget;
+						this.updateToTarget = 0;
+					}
+					this.updateValue( val + this.value + activeOffset, animSteps );
+				},
+
+				updateValue:function( val, animSteps ) {
+					this.updateToTarget = val;
+					fromVal = this.value;
+					toVal = val;
+					stepVal = Math.floor( (toVal - fromVal) / animSteps );
+
+					infoObj = this;
+					this.updateValueFunc = function() {
+						if( this.value + stepVal > toVal ) {
+							this.value = toVal;
+
+							infoObj.updateValueFunc = null;
+							infoObj.updateTotarget = 0;
+							return;
+						}
+						else
+							this.value += stepVal;
+					}
+				},
+
+				tick : function() {
+					if( this.updateValueFunc )
+						this.updateValueFunc();
+
+					with( this.renderer.ctx ) {
+						font = "15px Verdana";
+						fillStyle = "#000";
+						fillText( this.name + ":" + this.value, this.pos.x, this.pos.y );
+					}
+				}
+			}
+
+			StageLabel = function(name, x, y) {
+				this.name = name;
+				this.x = x;
+				this.y = y;
+				this.renderer = null;
+			};
+			StageLabel.prototype = {
+				tick : function() {
+					with( this.renderer.ctx ) {
+						font = "20px Verdana";
+						fillText( this.name, this.x, this.y );
+					}
+				}
+			};
+
+
+			TimerLabel = function(name, x, y) {
+				this.name = name;
+				this.x = x;
+				this.y = y;
+				this.renderer = null;
+
+				this.seconds = 0;
+				this.ticks = 0;
+				this.active = false;
+			};
+			TimerLabel.prototype = {
+				tick : function() {
+					if( this.active )
+						this.ticks ++;
+
+					if( this.ticks >= this.renderer.fps ) {
+						this.seconds++;
+						this.ticks = 0;
+					}
+					with( this.renderer.ctx ) {
+						font = "15px Verdana";
+						fillStyle = "#000";
+						fillText( this.name + ":" + this.seconds, this.x, this.y );
+					}
+				},
+				
+			};
+
+
+			//Stage which occupies the screen
+			stage = new TiledStage();
+			stage.init( canvasElement, 50, 45 -1 );
+
+			var xby2 = Math.floor(stage.xTiles/2);
+			var yby2 = Math.floor(stage.yTiles/2);
+
+			snake2 = new Snake();
+			snake2.init(xby2 -2,yby2,Dir.UP);
+			snake2.setColor( '#0cc' );
+			snake2.name = "snake2";
+			stage.add( snake2 );
+			stage.trigger( Key.LEFT, function() { snake2.goRight(); } );
+			stage.trigger( Key.RIGHT, function() { snake2.goLeft(); } );
+			stage.trigger( Key.UP, function() { snake2.goDown(); } );
+			stage.trigger( Key.DOWN, function() { snake2.goUp(); } );
+
+			snake = new Snake();
+			snake.init(xby2 + 2,yby2,Dir.DOWN);
+			snake.setColor( '#f00' );
+			stage.add( snake );
+
+			score = new StatsInfo("Score", 20, 30 );
+			stage.add( score );
+
+			gameTime = new TimerLabel( "Time", 20, 60 );
+			stage.add( gameTime );
+
+			//gameName = new StageLabel( "INVERTED SNAKES by Kalyan", 20, 30 );
+			//stage.add( gameName );
+
+			gameActive = false;
+
+			stage.trigger( Key.LEFT, function() { snake.goLeft(); } );
+			stage.trigger( Key.RIGHT, function() { snake.goRight(); } );
+			stage.trigger( Key.UP, function() { snake.goUp(); } );
+			stage.trigger( Key.DOWN, function() { snake.goDown(); } );
+			stage.trigger( Key.SPACE, function() {
+				if( gameActive == false ) {
+					stage.startRender();
+					gameTime.active = true;
+					gameActive = true;
+				} else {
+					stage.stopRender();
+					gameTime.active = false;
+					gameActive = false;
+				};
+
+			});
+
+			foodManager = new FoodManager();
+			foodManager.addSnake( snake );
+			foodManager.addSnake( snake2 );
+			foodManager.setupFoods();
+			foodManager.onNewFood = function(args) {
+				score.addValue( 100, 20 );
+			}
+
+			document.onkeydown = function(event) {
+				stage.readKey(event);
+			};
+
+			stage.setRenderFPS( 20 );
+			// Render once
+			stage.render();
+		</script>
+	</body>
+</html>
+	
+
+
